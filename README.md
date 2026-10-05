@@ -1,4 +1,52 @@
-# React + TypeScript + Vite
+# Expenses UI
+
+Frontend React com TypeScript e Vite. A interface atual é o template inicial.
+
+## Executar em container
+
+Partindo da raiz do repositório:
+
+```bash
+cd expenses-infrastructure
+docker --context desktop-linux compose up -d --build --wait
+```
+
+Acesse <http://localhost:5173>. O Dockerfile executa `npm ci` e `npm run build`
+com Node 24. A imagem final usa Nginx sem root na porta interna 8080 e serve
+somente os arquivos compilados de `dist`.
+
+O Nginx encaminha `/api/` para o backend na rede do Compose. Por exemplo,
+`/api/health/db` acessa `/health/db` da API. Use esse prefixo em chamadas HTTP
+do React para manter a mesma origem. Valores `VITE_*` usados pelo Vite fazem
+parte dos arquivos públicos; configure somente dados públicos nesse formato.
+
+Rotas da aplicação têm fallback para `index.html`. Assets com nomes gerados pelo
+Vite recebem cache longo; o HTML deve ser revalidado. Para atualizar o container
+após alterações, execute novamente o comando com `--build`.
+
+Consulte portas, configuração, logs e encerramento no [guia de infraestrutura](../expenses-infrastructure/README.md).
+
+## Desenvolvimento com Vite
+
+Dentro de `expenses-ui`, com Node 24 instalado:
+
+```bash
+npm ci
+npm run dev
+```
+
+O proxy `/api/` descrito acima pertence ao Nginx do container. O servidor Vite
+ainda usa a configuração original, sem proxy de API. Pare o container frontend
+antes de usar a porta 5173 com Vite.
+
+Para gerar os arquivos estáticos e verificar o código:
+
+```bash
+npm run build
+npm run lint
+```
+
+## Template React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
