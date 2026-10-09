@@ -1,80 +1,43 @@
 # Expenses UI
 
-Frontend React com TypeScript e Vite. A interface atual é o template inicial.
+React/TypeScript/Vite, Node 24. Interface de autenticação do Contas da Casa: `/login`, `/cadastro` e `/` com identidade e saída da conta. Cadastro não autentica automaticamente. Household, recuperação de senha, MFA e login social estão fora desta entrega.
 
-## Executar em container
+## Segurança e sessão
 
-Partindo da raiz do repositório:
+A API é acessada na mesma origem, pelo prefixo `/api/`. Cookies de autenticação são HttpOnly/Secure/SameSite Strict; tokens não são lidos pelo React. O token CSRF fica apenas em memória. Somente o e-mail é salvo em localStorage mediante opção; desmarcar remove a preferência. Senha e credenciais não são persistidas pelo aplicativo.
 
-```bash
-cd expenses-infrastructure
-docker --context desktop-linux compose up -d --build --wait
-```
+A sessão é consultada na abertura, ao retomar a aba e após a expiração do acesso. Falhas encerram a visão autenticada; conflito de renovação preserva a sessão e apresenta mensagem. Não há repetição automática de login/cadastro. Uma repetição manual de cadastro no mesmo formulário/e-mail reutiliza a chave de idempotência. Alterar a senha nessa repetição não altera a credencial do cadastro original. Sair atualiza as demais abas via BroadcastChannel; autorização/revogação continuam sendo responsabilidade do backend. Sem BroadcastChannel, a aba consulta a sessão ao recuperar foco.
 
-Acesse <http://localhost:5173>. O Dockerfile executa `npm ci` e `npm run build`
-com Node 24. A imagem final usa Nginx sem root na porta interna 8080 e serve
-somente os arquivos compilados de `dist`.
-
-O Nginx encaminha `/api/` para o backend na rede do Compose. Por exemplo,
-`/api/health/db` acessa `/health/db` da API. Use esse prefixo em chamadas HTTP
-do React para manter a mesma origem. Valores `VITE_*` usados pelo Vite fazem
-parte dos arquivos públicos; configure somente dados públicos nesse formato.
-
-Rotas da aplicação têm fallback para `index.html`. Assets com nomes gerados pelo
-Vite recebem cache longo; o HTML deve ser revalidado. Para atualizar o container
-após alterações, execute novamente o comando com `--build`.
-
-Consulte portas, configuração, logs e encerramento no [guia de infraestrutura](../expenses-infrastructure/README.md).
-
-## Desenvolvimento com Vite
-
-Dentro de `expenses-ui`, com Node 24 instalado:
+## Verificar localmente
 
 ```bash
 npm ci
-npm run dev
+npm run lint
+npm test
+npm run build
 ```
 
-O proxy `/api/` descrito acima pertence ao Nginx do container. O servidor Vite
-ainda usa a configuração original, sem proxy de API. Pare o container frontend
-antes de usar a porta 5173 com Vite.
-
-Para gerar os arquivos estáticos e verificar o código:
+Só testes unitários ficam neste projeto. Para jornadas reais no navegador com banco descartável, Liquibase, HTTPS e identidade simulada, executar em [expenses-tests](../expenses-tests/README.md):
 
 ```bash
-npm run build
-npm run lint
+python3 scripts/lab.py all
 ```
 
-## Template React + TypeScript + Vite
+O laboratório não usa AWS, não altera o banco de desenvolvimento e destrói seus recursos ao terminar. Ele não homologa latência do Cognito.
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+## Desenvolvimento com HTTPS e API real
 
-Currently, two official plugins are available:
+O Vite tem proxy `/api` para `https://localhost:7285` por padrão, configurável por `EXPENSES_API_URL`. A verificação do certificado da API permanece habilitada. Antes de autenticar:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Disponibilizar certificados locais para localhost, confiáveis no navegador e no processo Node (CA privada via `NODE_EXTRA_CA_CERTS` quando necessário). Nunca versionar chaves privadas.
+2. Configurar os caminhos `EXPENSES_TLS_CERT` e `EXPENSES_TLS_KEY` no processo do Vite; ambos habilitam HTTPS. São configuração do servidor, não variáveis `VITE_*`.
+3. Iniciar API no perfil `https`, com banco migrado, configuração Cognito privada e chaves de sessão. Consultar a [operação da FDD](../expenses-docs/fdd/FDD-Criacao-Usuario-Autenticacao/4-operacao.md).
+4. Executar `npm run dev` e abrir a origem HTTPS exibida. O proxy preserva o Host para a verificação de mesma origem; não desabilitar CSRF/TLS.
 
-## React Compiler
+Sem certificados, Vite pode exibir a interface por HTTP, mas não é um ambiente válido para autenticação. `VITE_*` sempre é público; nunca colocar segredos ali.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Container existente
 
-## Expanding the Oxlint configuration
+O Dockerfile compila com Node 24 e publica com Nginx sem root. O Nginx já suporta as rotas React e o proxy `/api/`. Reconstruir a imagem para incorporar mudanças. **O Compose atual publica HTTP e não injeta a configuração privada Cognito do host:** a tela pode ser visualizada, mas autenticação real exige concluir HTTPS/configuração de execução. Não confundir isso com o laboratório HTTPS validado.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Consulte o [guia de infraestrutura](../expenses-infrastructure/README.md). Os serviços de desenvolvimento foram parados para esta entrega; o banco foi preservado.
